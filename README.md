@@ -17,7 +17,7 @@ This repository contains two small browser-based arcade games built as a playful
 - Features: two-player local play, neon styling, keyboard + touch support, score tracking
 
 ### 3. Archelog
-- Location: [Play Archelog](https://paweltarkowski.github.io/web-games/archelog/)
+- Location: [Play Archeolog](https://paweltarkowski.github.io/web-games/archeolog/)
 - Genre: Arcade paddle game
 - Features: one-player local play, archelogy style, keyboard + touch support, score tracking
 ## How to run

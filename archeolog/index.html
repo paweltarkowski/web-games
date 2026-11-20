@@ -369,7 +369,7 @@
                 <span>🥤 MANIERKA: +1 Życie</span>
             </div>
             <p style="font-size: 0.58rem; color: #f5b82e;">
-                RUCH / LINY: Strzałki lub WSAD • SKOK: X / W / Strzałka w górę • STRZAŁ: Spacja / Z
+                RUCH / LINY: Strzałki lub WSAD • GÓRA/W: Wchodzenie po linie lub skok • SKOK: X / przycisk SKOK • STRZAŁ: Spacja / Z
             </p>
             <button class="btn-atari" id="startBtn">ROZPOCZNIJ EKSPEDYCJĘ</button>
         </div>
@@ -401,7 +401,7 @@
 
     <!-- Pasek narzędzi -->
     <div class="toolbar">
-        <span class="controls-hint">KLAWIATURA: STRZAŁKI / WSAD • SKOK: X / GÓRA • STRZAŁ: SPACJA / Z • PAUZA: P</span>
+        <span class="controls-hint">KLAWIATURA: STRZAŁKI / WSAD • GÓRA/W: LINY/SKOK • SKOK: X • STRZAŁ: SPACJA / Z • PAUZA: P</span>
         <div class="btn-mini-group">
             <button class="btn-mini" id="pauseBtn">PAUZA</button>
             <button class="btn-mini" id="crtBtn">CRT: WŁ.</button>
@@ -583,7 +583,9 @@
             facing: 1, // 1 = prawo, -1 = lewo
             animTimer: 0,
             invulnTimer: 0,
-            shootCooldown: 0
+            shootCooldown: 0,
+            coyoteTimer: 0,
+            jumpBuffer: 0
         };
 
         // Stan klawiszy i przycisków dotykowych
@@ -748,6 +750,8 @@
                         player.onGround = false;
                         player.onRope = false;
                         player.invulnTimer = 1.0;
+                        player.coyoteTimer = 0;
+                        player.jumpBuffer = 0;
                     } else if (ch === 'E') {
                         exitDoor = { x: px, y: py, w: TILE, h: TILE };
                     } else if (ch === 'K') {
@@ -883,6 +887,19 @@
             if (player.invulnTimer > 0) player.invulnTimer -= dt;
             if (player.shootCooldown > 0) player.shootCooldown -= dt;
 
+            if (player.onGround) {
+                player.coyoteTimer = 0.12;
+            } else {
+                player.coyoteTimer = Math.max(0, player.coyoteTimer - dt);
+            }
+
+            if (input.jumpPressed) {
+                player.jumpBuffer = 0.12;
+                input.jumpPressed = false;
+            } else {
+                player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
+            }
+
             // Strzał z rewolweru
             if (input.shootPressed) {
                 input.shootPressed = false;
@@ -932,10 +949,11 @@
                 }
 
                 // Zeskoczenie z liny klawiszem SKOK
-                if (input.jumpPressed) {
-                    input.jumpPressed = false;
+                if (player.jumpBuffer > 0) {
+                    player.jumpBuffer = 0;
                     player.onRope = false;
                     player.vy = player.jumpForce * 0.9;
+                    player.coyoteTimer = 0;
                     playPokey('jump');
                 }
 
@@ -970,14 +988,14 @@
                     player.animTimer = 0;
                 }
 
-                // Skok z ziemi
-                if (input.jumpPressed && player.onGround) {
-                    input.jumpPressed = false;
+                // Skok z ziemi (bufor i coyote czas poprawiają skoki z krawędzi)
+                if (player.jumpBuffer > 0 && player.coyoteTimer > 0) {
+                    player.jumpBuffer = 0;
+                    player.coyoteTimer = 0;
                     player.vy = player.jumpForce;
                     player.onGround = false;
                     playPokey('jump');
                 }
-                input.jumpPressed = false;
 
                 // Grawitacja
                 player.vy += 760 * dt;
@@ -1525,7 +1543,7 @@
             if (k === 'arrowleft' || k === 'a') input.left = true;
             if (k === 'arrowright' || k === 'd') input.right = true;
             if (k === 'arrowup' || k === 'w') {
-                if (!input.up) input.jumpPressed = true;
+                if (!input.up && !player.onRope) input.jumpPressed = true;
                 input.up = true;
             }
             if (k === 'arrowdown' || k === 's') input.down = true;
@@ -1552,7 +1570,10 @@
                 btn.classList.add('pressed');
                 if (key === 'left') input.left = true;
                 if (key === 'right') input.right = true;
-                if (key === 'up') { input.up = true; input.jumpPressed = true; }
+                if (key === 'up') {
+                    if (!input.up && !player.onRope) input.jumpPressed = true;
+                    input.up = true;
+                }
                 if (key === 'down') input.down = true;
                 if (key === 'jump') input.jumpPressed = true;
                 if (key === 'shoot') input.shootPressed = true;

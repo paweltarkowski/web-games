@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZAGINIONY GROBOWIEC: ARCHEOLOG // ATARI 8-BIT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-void: #070503;
+            --atari-gold: #f5b82e;
+            --atari-sand: #d48b3b;
+            --atari-cyan: #2ce8f5;
+            --atari-red: #e43b44;
+            --atari-green: #63c74d;
+            --panel-bg: #140e08;
+            --border-stone: #5a3921;
+            --text-main: #fff3d6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            background-color: var(--bg-void);
+            color: var(--text-main);
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 8px;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at center, #1b1108 0%, #050302 100%);
+        }
+
+        /* Efekt linii CRT z telewizora Atari */
+        body.crt-on::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.28) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Nagłówek w stylu Atari */
+        header {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: clamp(0.85rem, 3vw, 1.45rem);
+            color: var(--atari-gold);
+            text-shadow: 3px 3px 0px #6b2b06, 0 0 14px rgba(245, 184, 46, 0.5);
+            letter-spacing: 1px;
+        }
+
+        /* Górny pasek stanu (HUD) */
+        .hud {
+            width: 100%;
+            max-width: 820px;
+            background: var(--panel-bg);
+            border: 3px solid var(--border-stone);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+        }
+
+        @media (max-width: 680px) {
+            .hud {
+                grid-template-columns: repeat(3, 1fr);
+                padding: 6px 8px;
+            }
+        }
+
+        .hud-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .hud-label {
+            font-size: clamp(0.48rem, 1.4vw, 0.62rem);
+            color: #a88763;
+        }
+
+        .hud-val {
+            font-size: clamp(0.62rem, 1.8vw, 0.82rem);
+            color: var(--atari-gold);
+        }
+
+        .hud-val.cyan { color: var(--atari-cyan); }
+        .hud-val.green { color: var(--atari-green); }
+        .hud-val.red { color: var(--atari-red); }
+
+        /* Główny ekran gry */
+        .game-frame {
+            position: relative;
+            width: 100%;
+            max-width: 820px;
+            aspect-ratio: 16 / 10;
+            background: #000000;
+            border: 4px solid var(--border-stone);
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(212, 139, 59, 0.25), inset 0 0 20px rgba(0, 0, 0, 0.9);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* Nakładki ekranowe (Start, Podsumowanie poziomu, Koniec gry, Zwycięstwo) */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(10, 7, 4, 0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 18px;
+            z-index: 20;
+            transition: opacity 0.2s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .overlay h2 {
+            font-size: clamp(1rem, 3.5vw, 1.75rem);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .title-gold { color: var(--atari-gold); text-shadow: 2px 2px 0 #6b2b06; }
+        .title-cyan { color: var(--atari-cyan); text-shadow: 2px 2px 0 #0b4f59; }
+        .title-red  { color: var(--atari-red);  text-shadow: 2px 2px 0 #590b12; }
+
+        .overlay p {
+            font-size: clamp(0.55rem, 1.6vw, 0.72rem);
+            line-height: 1.75;
+            color: #e6d5b8;
+            max-width: 580px;
+            margin-bottom: 14px;
+        }
+
+        .legend-box {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            background: rgba(40, 25, 12, 0.75);
+            border: 2px solid var(--border-stone);
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            font-size: clamp(0.5rem, 1.4vw, 0.62rem);
+            color: #ffd98e;
+        }
+
+        .btn-atari {
+            font-family: 'Press Start 2P', monospace;
+            font-size: clamp(0.7rem, 2.2vw, 0.95rem);
+            color: #140b04;
+            background: linear-gradient(180deg, #ffd452 0%, #d48b3b 100%);
+            border: 3px solid #fff2b2;
+            border-radius: 8px;
+            padding: 14px 24px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #6b3810;
+            transition: transform 0.1s, filter 0.15s;
+            text-transform: uppercase;
+        }
+
+        .btn-atari:hover {
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-atari:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #6b3810;
+        }
+
+        /* Pasek opcji pod ekranem */
+        .toolbar {
+            width: 100%;
+            max-width: 820px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            gap: 8px;
+        }
+
+        .controls-hint {
+            font-size: clamp(0.48rem, 1.4vw, 0.6rem);
+            color: #9c7e5c;
+        }
+
+        .btn-mini-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-mini {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.55rem;
+            background: var(--panel-bg);
+            color: var(--atari-gold);
+            border: 2px solid var(--border-stone);
+            border-radius: 6px;
+            padding: 7px 10px;
+            cursor: pointer;
+        }
+
+        .btn-mini:active {
+            background: #2b1d10;
+        }
+
+        /* Sterowanie dotykowe dla telefonów i tabletów */
+        .touch-controls {
+            display: none;
+            width: 100%;
+            max-width: 820px;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            padding: 4px 8px;
+        }
+
+        @media (max-width: 840px), (pointer: coarse) {
+            .touch-controls {
+                display: flex;
+            }
+            .controls-hint {
+                display: none;
+            }
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 48px);
+            grid-template-rows: repeat(3, 48px);
+            gap: 4px;
+        }
+
+        .t-btn {
+            background: rgba(45, 29, 15, 0.85);
+            border: 2px solid var(--atari-sand);
+            border-radius: 8px;
+            color: var(--atari-gold);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .t-btn:active, .t-btn.pressed {
+            background: var(--atari-gold);
+            color: #140b04;
+        }
+
+        .d-up    { grid-column: 2; grid-row: 1; }
+        .d-left  { grid-column: 1; grid-row: 2; }
+        .d-right { grid-column: 3; grid-row: 2; }
+        .d-down  { grid-column: 2; grid-row: 3; }
+
+        .action-pad {
+            display: flex;
+            gap: 12px;
+        }
+
+        .act-btn {
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            font-size: 0.6rem;
+            border-width: 3px;
+        }
+
+        .act-jump {
+            border-color: var(--atari-cyan);
+            color: var(--atari-cyan);
+        }
+
+        .act-shoot {
+            border-color: var(--atari-red);
+            color: var(--atari-red);
+        }
+    </style>
+</head>
+<body class="crt-on">
+
+    <header>
+        <h1>ZAGINIONY GROBOWIEC: ARCHEOLOG</h1>
+    </header>
+
+    <!-- Górny pasek stanu Atari -->
+    <div class="hud">
+        <div class="hud-cell">
+            <span class="hud-label">PLANSZA</span>
+            <span class="hud-val cyan" id="hudLevel">1 / 3</span>
+        </div>
+        <div class="hud-cell">
+            <span class="hud-label">PUNKTY</span>
+            <span class="hud-val" id="hudScore">00000</span>
+        </div>
+        <div class="hud-cell">
+            <span class="hud-label">REKORD</span>
+            <span class="hud-val" id="hudHigh">00000</span>
+        </div>
+        <div class="hud-cell">
+            <span class="hud-label">ŻYCIA</span>
+            <span class="hud-val red" id="hudLives">♥♥♥</span>
+        </div>
+        <div class="hud-cell">
+            <span class="hud-label">NABOJE</span>
+            <span class="hud-val" id="hudAmmo">6</span>
+        </div>
+        <div class="hud-cell">
+            <span class="hud-label">ZŁOTY KLUCZ</span>
+            <span class="hud-val red" id="hudKey">BRAK</span>
+        </div>
+    </div>
+
+    <!-- Ramka z ekranem Canvas -->
+    <div class="game-frame" id="gameFrame">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Ekran startowy -->
+        <div class="overlay" id="startOverlay">
+            <h2 class="title-gold">KLĄTWA PIRAMIDY</h2>
+            <p>
+                Wciel się w odkrywcę w kapeluszu! Przeszukaj <strong>3 komnaty grobowca</strong>, wspinaj się po linach, zbieraj skarby i odnajdź <strong>Złoty Klucz</strong>, aby otworzyć wyjście.
+            </p>
+            <div class="legend-box">
+                <span>🔑 KLUCZ: Otwiera wyjście</span>
+                <span>💎 SKARB: +250 pkt</span>
+                <span>🔫 NABOJE: Ogłuszają mumie</span>
+                <span>🥤 MANIERKA: +1 Życie</span>
+            </div>
+            <p style="font-size: 0.58rem; color: #f5b82e;">
+                RUCH / LINY: Strzałki lub WSAD • SKOK: X / W / Strzałka w górę • STRZAŁ: Spacja / Z
+            </p>
+            <button class="btn-atari" id="startBtn">ROZPOCZNIJ EKSPEDYCJĘ</button>
+        </div>
+
+        <!-- Ekran ukończenia pojedynczej planszy -->
+        <div class="overlay hidden" id="stageClearOverlay">
+            <h2 class="title-cyan" id="stageClearTitle">PLANSZA 1 UKOŃCZONA!</h2>
+            <p id="stageClearDesc">Udało Ci się wydostać z komnaty ze skarbami!</p>
+            <p style="color: var(--atari-gold);" id="stageBonusText">PREMIA ZA AMUNICJĘ I ŻYCIA: +500 PKT</p>
+            <button class="btn-atari" id="nextStageBtn">NASTĘPNA KOMNATA ▶</button>
+        </div>
+
+        <!-- Ekran końca gry -->
+        <div class="overlay hidden" id="gameOverOverlay">
+            <h2 class="title-red">KONIEC EKSPEDYCJI</h2>
+            <p>Klątwa faraona dopadła odkrywcę w podziemiach...</p>
+            <p style="color: var(--atari-gold);" id="finalGameOverScore">TWÓJ WYNIK: 0</p>
+            <button class="btn-atari" id="retryBtn">SPRÓBUJ PONOWNIE</button>
+        </div>
+
+        <!-- Ekran wielkiego zwycięstwa po 3 planszach -->
+        <div class="overlay hidden" id="victoryOverlay">
+            <h2 class="title-gold">SKARB FARAONA ZDOBYTY!</h2>
+            <p>Przeszedłeś wszystkie 3 komnaty Zaginionego Grobowca i przeszedłeś do historii archeologii!</p>
+            <p style="color: var(--atari-cyan);" id="finalVictoryScore">KOŃCOWY WYNIK: 0</p>
+            <button class="btn-atari" id="playAgainVictoryBtn">ZAGRAJ OD NOWA</button>
+        </div>
+    </div>
+
+    <!-- Pasek narzędzi -->
+    <div class="toolbar">
+        <span class="controls-hint">KLAWIATURA: STRZAŁKI / WSAD • SKOK: X / GÓRA • STRZAŁ: SPACJA / Z • PAUZA: P</span>
+        <div class="btn-mini-group">
+            <button class="btn-mini" id="pauseBtn">PAUZA</button>
+            <button class="btn-mini" id="crtBtn">CRT: WŁ.</button>
+            <button class="btn-mini" id="soundBtn">DŹWIĘK: WŁ.</button>
+        </div>
+    </div>
+
+    <!-- Przyciski dotykowe dla ekranów mobilnych -->
+    <div class="touch-controls">
+        <div class="dpad">
+            <button class="t-btn d-up" data-key="up">▲</button>
+            <button class="t-btn d-left" data-key="left">◄</button>
+            <button class="t-btn d-right" data-key="right">►</button>
+            <button class="t-btn d-down" data-key="down">▼</button>
+        </div>
+        <div class="action-pad">
+            <button class="t-btn act-btn act-jump" data-key="jump">SKOK</button>
+            <button class="t-btn act-btn act-shoot" data-key="shoot">STRZAŁ</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ZAGINIONY GROBOWIEC: ARCHEOLOG
+         * Gra platformowa w stylu klasycznego "Freda" (Atari XL/XE, 1984)
+         * 3 rozbudowane plansze, fizyka lin, przeciwnicy i synteza dźwięku POKEY.
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameFrame = document.getElementById('gameFrame');
+
+        // Elementy HUD i nakładek
+        const hudLevel = document.getElementById('hudLevel');
+        const hudScore = document.getElementById('hudScore');
+        const hudHigh  = document.getElementById('hudHigh');
+        const hudLives = document.getElementById('hudLives');
+        const hudAmmo  = document.getElementById('hudAmmo');
+        const hudKey   = document.getElementById('hudKey');
+
+        const startOverlay      = document.getElementById('startOverlay');
+        const stageClearOverlay = document.getElementById('stageClearOverlay');
+        const gameOverOverlay   = document.getElementById('gameOverOverlay');
+        const victoryOverlay    = document.getElementById('victoryOverlay');
+
+        // Logiczna rozdzielczość Atari (25 kolumn x 15 wierszy po 32px = 800x480)
+        const TILE = 32;
+        const COLS = 25;
+        const ROWS = 15;
+        const WORLD_W = COLS * TILE; // 800
+        const WORLD_H = ROWS * TILE; // 480
+
+        /**
+         * Legenda znaków mapy:
+         * '#' - Kamienny blok piramidy (ściana/podłoga)
+         * '=' - Cieńsza półka skalna (można po niej chodzić i wspinać się liną)
+         * 'H' - Lina wspinaczkowa (wisząca w pionie)
+         * '.' - Pusta przestrzeń komnaty
+         * 'P' - Pozycja startowa Archeologa
+         * 'E' - Drzwi wyjściowe z komnaty (otwierane Złotym Kluczem)
+         * 'K' - Złoty Klucz (obowiązkowy do otwarcia wyjścia)
+         * 'T' - Skrzynia skarbów / Złoty kielich (+250 pkt)
+         * 'G' - Szmaragd / Rubin (+100 pkt)
+         * 'A' - Pudełko naboi do rewolweru (+4 naboje)
+         * 'W' - Manierka z wodą (+1 życie, maks. 5)
+         * 'M' - Mumia (patroluje korytarze)
+         * 'S' - Pająk grobowy (zjeżdża i wjeżdża po linie)
+         * 'B' - Nietoperz / Skarabeusz (lata falą w poziomie)
+         * 'D' - Kropla kwasu / spadający kamień ze stropu
+         */
+        const LEVELS = [
+            // PLANSZA 1: KOMNATA SKARABEUSZY
+            {
+                name: "PLANSZA 1: KOMNATA SKARABEUSZY",
+                wallColor: "#b86f28",
+                wallTrim:  "#f5b82e",
+                bgTint:    "#0c0805",
+                grid: [
+                    "#########################",
+                    "#P..G...H...T...H...G..E#",
+                    "#####...H..###..H...#####",
+                    "#...H...H...D...H...H...#",
+                    "#..###..H..###..H..###..#",
+                    "#...H...H...G...H...H...#",
+                    "#...H..#######..H...H...#",
+                    "#..G...S..M.....S..G....#",
+                    "#####..#######..#########",
+                    "#...H.....D.....H...A...#",
+                    "#...H..###.###..H..###..#",
+                    "#...H...H...T...H...H...#",
+                    "#..W....H..###..H....K..#",
+                    "#########################",
+                    "#########################"
+                ]
+            },
+            // PLANSZA 2: KORYTARZE MUMII
+            {
+                name: "PLANSZA 2: KORYTARZE MUMII",
+                wallColor: "#267378",
+                wallTrim:  "#2ce8f5",
+                bgTint:    "#040c0e",
+                grid: [
+                    "#########################",
+                    "#K..T...H...D...H...G..E#",
+                    "#####...H..###..H...#####",
+                    "#...H..S....B....S..H...#",
+                    "#...H..####...####..H...#",
+                    "#...H...H...T...H...H...#",
+                    "###.H...H..###..H...H.###",
+                    "#...H...M.......M...H...#",
+                    "#..#######..H..#######..#",
+                    "#.....D.....H.....A.....#",
+                    "#.###...#########...###.#",
+                    "#..G....H...W...H....T..#",
+                    "#P......H..###..H......G#",
+                    "#########################",
+                    "#########################"
+                ]
+            },
+            // PLANSZA 3: KRYPTA FARAONA
+            {
+                name: "PLANSZA 3: KRYPTA FARAONA",
+                wallColor: "#8f283b",
+                wallTrim:  "#ff6b81",
+                bgTint:    "#0f0407",
+                grid: [
+                    "#########################",
+                    "#E..G...H...T...H...T..K#",
+                    "#####...H..###..H...#####",
+                    "#...H..S....D....S..H...#",
+                    "#...H..###..B..###..H...#",
+                    "#...H...H.......H...H...#",
+                    "#.#####.H..###..H.#####.#",
+                    "#...M.......H.......M...#",
+                    "#..#######..H..#######..#",
+                    "#...A...H...D...H...W...#",
+                    "#.###...H..###..H...###.#",
+                    "#..G....H..S....H....G..#",
+                    "#P......H...M...H......T#",
+                    "#########################",
+                    "#########################"
+                ]
+            }
+        ];
+
+        // Stan globalny gry
+        let levelIndex = 0;
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('zaginionyGrobowiecHigh') || '0', 10);
+        let lives = 3;
+        let ammo = 6;
+        let hasKey = false;
+        let gameState = 'START'; // START, PLAYING, PAUSED, STAGECLEAR, GAMEOVER, VICTORY
+        let soundEnabled = true;
+        let globalTime = 0;
+
+        // Dane bieżącej planszy
+        let tiles = [];
+        let ropes = []; // Tablica logiczna [r][c]
+        let items = [];
+        let enemies = [];
+        let hazards = []; // Krople kwasu
+        let bullets = [];
+        let particles = [];
+        let exitDoor = { x: 0, y: 0, w: TILE, h: TILE };
+
+        // Obiekt gracza (Archeolog w kapeluszu)
+        const player = {
+            x: 40,
+            y: 40,
+            w: 20,
+            h: 28,
+            vx: 0,
+            vy: 0,
+            speed: 145,
+            climbSpeed: 115,
+            jumpForce: -295,
+            onGround: false,
+            onRope: false,
+            facing: 1, // 1 = prawo, -1 = lewo
+            animTimer: 0,
+            invulnTimer: 0,
+            shootCooldown: 0
+        };
+
+        // Stan klawiszy i przycisków dotykowych
+        const input = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            jumpPressed: false,
+            shootPressed: false
+        };
+
+        // ==========================================
+        // SYNTEZATOR DŹWIĘKÓW ATARI POKEY (Web Audio)
+        // ==========================================
+        let audioCtx = null;
+
+        function ensureAudio() {
+            if (!audioCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (AC) audioCtx = new AC();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playPokey(type) {
+            if (!soundEnabled) return;
+            ensureAudio();
+            if (!audioCtx) return;
+
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'jump') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(190, now);
+                    osc.frequency.exponentialRampToValueAtTime(480, now + 0.14);
+                    gain.gain.setValueAtTime(0.11, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'shoot') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(75, now + 0.16);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.17);
+                    osc.start(now);
+                    osc.stop(now + 0.17);
+                } else if (type === 'pickup') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(587.33, now);
+                    osc.frequency.setValueAtTime(880, now + 0.06);
+                    gain.gain.setValueAtTime(0.11, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'key') {
+                    osc.type = 'square';
+                    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                        osc.frequency.setValueAtTime(f, now + i * 0.07);
+                    });
+                    gain.gain.setValueAtTime(0.13, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+                    osc.start(now);
+                    osc.stop(now + 0.34);
+                } else if (type === 'stun') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(240, now);
+                    osc.frequency.linearRampToValueAtTime(110, now + 0.14);
+                    gain.gain.setValueAtTime(0.14, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'hurt') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.linearRampToValueAtTime(55, now + 0.35);
+                    gain.gain.setValueAtTime(0.16, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+                    osc.start(now);
+                    osc.stop(now + 0.36);
+                } else if (type === 'stageClear') {
+                    osc.type = 'square';
+                    const melody = [392, 523.25, 659.25, 783.99, 659.25, 1046.5];
+                    melody.forEach((f, i) => {
+                        osc.frequency.setValueAtTime(f, now + i * 0.09);
+                    });
+                    gain.gain.setValueAtTime(0.13, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'step') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(130, now);
+                    gain.gain.setValueAtTime(0.04, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+                    osc.start(now);
+                    osc.stop(now + 0.03);
+                }
+            } catch (e) {}
+        }
+
+        // ==========================================
+        // DOPASOWANIE ROZDZIELCZOŚCI CANVAS
+        // ==========================================
+        function resizeCanvas() {
+            const rect = gameFrame.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.setTransform(
+                (rect.width / WORLD_W) * dpr,
+                0,
+                0,
+                (rect.height / WORLD_H) * dpr,
+                0,
+                0
+            );
+            render();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // ==========================================
+        // ŁADOWANIE PLANSZY I PARSOWANIE MAPY
+        // ==========================================
+        function loadLevel(idx) {
+            levelIndex = idx;
+            const lvl = LEVELS[idx];
+            tiles = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+            ropes = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+            items = [];
+            enemies = [];
+            hazards = [];
+            bullets = [];
+            particles = [];
+            hasKey = false;
+
+            for (let r = 0; r < ROWS; r++) {
+                const rowStr = lvl.grid[r];
+                for (let c = 0; c < COLS; c++) {
+                    const ch = rowStr[c];
+                    const px = c * TILE;
+                    const py = r * TILE;
+
+                    if (ch === '#') {
+                        tiles[r][c] = 1;
+                    } else if (ch === 'H') {
+                        ropes[r][c] = true;
+                    } else if (ch === 'P') {
+                        player.x = px + (TILE - player.w) / 2;
+                        player.y = py + (TILE - player.h);
+                        player.vx = 0;
+                        player.vy = 0;
+                        player.onGround = false;
+                        player.onRope = false;
+                        player.invulnTimer = 1.0;
+                    } else if (ch === 'E') {
+                        exitDoor = { x: px, y: py, w: TILE, h: TILE };
+                    } else if (ch === 'K') {
+                        items.push({ type: 'key', x: px + 6, y: py + 6, w: 20, h: 20, collected: false });
+                    } else if (ch === 'T') {
+                        items.push({ type: 'chest', x: px + 5, y: py + 8, w: 22, h: 18, collected: false });
+                    } else if (ch === 'G') {
+                        items.push({ type: 'gem', x: px + 8, y: py + 8, w: 16, h: 16, collected: false });
+                    } else if (ch === 'A') {
+                        items.push({ type: 'ammo', x: px + 7, y: py + 8, w: 18, h: 18, collected: false });
+                    } else if (ch === 'W') {
+                        items.push({ type: 'water', x: px + 8, y: py + 6, w: 16, h: 20, collected: false });
+                    } else if (ch === 'M') {
+                        enemies.push({
+                            type: 'mummy',
+                            x: px + 6,
+                            y: py + 4,
+                            w: 20,
+                            h: 28,
+                            vx: 52 + idx * 12,
+                            dir: 1,
+                            stunTimer: 0
+                        });
+                    } else if (ch === 'S') {
+                        ropes[r][c] = true;
+                        enemies.push({
+                            type: 'spider',
+                            x: px + 6,
+                            y: py + 6,
+                            w: 20,
+                            h: 18,
+                            baseY: py + 6,
+                            range: 56 + idx * 14,
+                            speed: 55 + idx * 12,
+                            dir: 1,
+                            stunTimer: 0
+                        });
+                    } else if (ch === 'B') {
+                        enemies.push({
+                            type: 'bat',
+                            x: px + 4,
+                            y: py + 8,
+                            w: 24,
+                            h: 16,
+                            baseY: py + 8,
+                            vx: 85 + idx * 15,
+                            dir: 1,
+                            phase: Math.random() * Math.PI * 2,
+                            stunTimer: 0
+                        });
+                    } else if (ch === 'D') {
+                        hazards.push({
+                            spawnX: px + 12,
+                            spawnY: py + 2,
+                            x: px + 12,
+                            y: py + 2,
+                            w: 8,
+                            h: 10,
+                            vy: 0,
+                            waitTimer: 1.0 + Math.random() * 1.5
+                        });
+                    }
+                }
+            }
+
+            updateHUD();
+        }
+
+        function updateHUD() {
+            hudLevel.textContent = `${levelIndex + 1} / ${LEVELS.length}`;
+            hudScore.textContent = String(score).padStart(5, '0');
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('zaginionyGrobowiecHigh', String(highScore));
+            }
+            hudHigh.textContent = String(highScore).padStart(5, '0');
+            hudLives.textContent = '♥'.repeat(Math.max(0, lives));
+            hudAmmo.textContent = ammo;
+            hudKey.textContent = hasKey ? 'ZEBRANY!' : 'BRAK';
+            hudKey.className = hasKey ? 'hud-val green' : 'hud-val red';
+        }
+
+        // ==========================================
+        // KOLIZJE I FIZYKA (Z LINAMI JAK WE FREDZIE)
+        // ==========================================
+        function isSolidAt(px, py) {
+            const c = Math.floor(px / TILE);
+            const r = Math.floor(py / TILE);
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return true;
+            return tiles[r][c] === 1;
+        }
+
+        function isRopeAt(px, py) {
+            const c = Math.floor(px / TILE);
+            const r = Math.floor(py / TILE);
+            if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+            return ropes[r][c];
+        }
+
+        function spawnParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                const spd = 40 + Math.random() * 130;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(ang) * spd,
+                    vy: Math.sin(ang) * spd,
+                    life: 0.45 + Math.random() * 0.25,
+                    color
+                });
+            }
+        }
+
+        function fireRevolver() {
+            if (ammo <= 0 || player.shootCooldown > 0) return;
+            ammo--;
+            player.shootCooldown = 0.35;
+            updateHUD();
+            playPokey('shoot');
+
+            bullets.push({
+                x: player.facing === 1 ? player.x + player.w + 2 : player.x - 8,
+                y: player.y + 13,
+                w: 8,
+                h: 4,
+                vx: player.facing * 430,
+                life: 1.2
+            });
+        }
+
+        function updatePlayer(dt) {
+            if (player.invulnTimer > 0) player.invulnTimer -= dt;
+            if (player.shootCooldown > 0) player.shootCooldown -= dt;
+
+            // Strzał z rewolweru
+            if (input.shootPressed) {
+                input.shootPressed = false;
+                fireRevolver();
+            }
+
+            const centerX = player.x + player.w / 2;
+            const centerY = player.y + player.h / 2;
+            const feetY   = player.y + player.h - 2;
+
+            // Sprawdzanie obecności liny przy środku postaci lub tuż pod stopami
+            const touchingRope = isRopeAt(centerX, centerY) || isRopeAt(centerX, feetY);
+            const ropeBelow    = isRopeAt(centerX, player.y + player.h + 4);
+
+            // Chwytanie liny klawiszem GÓRA lub DÓŁ
+            if (!player.onRope) {
+                if ((input.up && touchingRope) || (input.down && (touchingRope || ropeBelow))) {
+                    player.onRope = true;
+                    player.vx = 0;
+                    player.vy = 0;
+                    // Wyrównaj gracza dokładnie do osi liny
+                    const ropeCol = Math.floor(centerX / TILE);
+                    player.x = ropeCol * TILE + (TILE - player.w) / 2;
+                }
+            }
+
+            if (player.onRope) {
+                // Poruszanie się na linie
+                player.vy = 0;
+                player.vx = 0;
+
+                if (input.up) {
+                    player.vy = -player.climbSpeed;
+                    player.animTimer += dt * 10;
+                } else if (input.down) {
+                    player.vy = player.climbSpeed;
+                    player.animTimer += dt * 10;
+                }
+
+                // Ruch w lewo/prawo na linie (możliwość zejścia na sąsiednią półkę)
+                if (input.left) {
+                    player.facing = -1;
+                    player.vx = -player.speed * 0.75;
+                } else if (input.right) {
+                    player.facing = 1;
+                    player.vx = player.speed * 0.75;
+                }
+
+                // Zeskoczenie z liny klawiszem SKOK
+                if (input.jumpPressed) {
+                    input.jumpPressed = false;
+                    player.onRope = false;
+                    player.vy = player.jumpForce * 0.9;
+                    playPokey('jump');
+                }
+
+                // Przesunięcie w poziomie i sprawdzenie czy gracz opuścił linę
+                moveHorizontal(dt);
+                moveVertical(dt);
+
+                const stillOnRope = isRopeAt(player.x + player.w / 2, player.y + player.h / 2) ||
+                                    isRopeAt(player.x + player.w / 2, player.y + player.h - 2);
+                if (!stillOnRope) {
+                    player.onRope = false;
+                }
+            } else {
+                // Standardowy ruch po podłodze i w powietrzu
+                player.vx = 0;
+                if (input.left) {
+                    player.vx = -player.speed;
+                    player.facing = -1;
+                }
+                if (input.right) {
+                    player.vx = player.speed;
+                    player.facing = 1;
+                }
+
+                if (player.vx !== 0 && player.onGround) {
+                    const prevStep = Math.floor(player.animTimer);
+                    player.animTimer += dt * 11;
+                    if (Math.floor(player.animTimer) !== prevStep && Math.floor(player.animTimer) % 2 === 0) {
+                        playPokey('step');
+                    }
+                } else if (player.onGround) {
+                    player.animTimer = 0;
+                }
+
+                // Skok z ziemi
+                if (input.jumpPressed && player.onGround) {
+                    input.jumpPressed = false;
+                    player.vy = player.jumpForce;
+                    player.onGround = false;
+                    playPokey('jump');
+                }
+                input.jumpPressed = false;
+
+                // Grawitacja
+                player.vy += 760 * dt;
+                if (player.vy > 420) player.vy = 420;
+
+                moveHorizontal(dt);
+                moveVertical(dt);
+            }
+        }
+
+        function moveHorizontal(dt) {
+            const nextX = player.x + player.vx * dt;
+            const margin = 2;
+            if (player.vx > 0) {
+                if (
+                    isSolidAt(nextX + player.w, player.y + margin) ||
+                    isSolidAt(nextX + player.w, player.y + player.h - margin)
+                ) {
+                    player.x = Math.floor((nextX + player.w) / TILE) * TILE - player.w - 0.1;
+                } else {
+                    player.x = nextX;
+                }
+            } else if (player.vx < 0) {
+                if (
+                    isSolidAt(nextX, player.y + margin) ||
+                    isSolidAt(nextX, player.y + player.h - margin)
+                ) {
+                    player.x = (Math.floor(nextX / TILE) + 1) * TILE + 0.1;
+                } else {
+                    player.x = nextX;
+                }
+            }
+        }
+
+        function moveVertical(dt) {
+            const nextY = player.y + player.vy * dt;
+            const margin = 3;
+            player.onGround = false;
+
+            if (player.vy > 0) {
+                if (
+                    isSolidAt(player.x + margin, nextY + player.h) ||
+                    isSolidAt(player.x + player.w - margin, nextY + player.h)
+                ) {
+                    player.y = Math.floor((nextY + player.h) / TILE) * TILE - player.h;
+                    player.vy = 0;
+                    player.onGround = true;
+                    player.onRope = false;
+                } else {
+                    player.y = nextY;
+                }
+            } else if (player.vy < 0) {
+                if (
+                    isSolidAt(player.x + margin, nextY) ||
+                    isSolidAt(player.x + player.w - margin, nextY)
+                ) {
+                    player.y = (Math.floor(nextY / TILE) + 1) * TILE;
+                    player.vy = 0;
+                } else {
+                    player.y = nextY;
+                }
+            }
+        }
+
+        // ==========================================
+        // AKTUALIZACJA POCISKÓW, SKARBÓW I WROGÓW
+        // ==========================================
+        function rectsOverlap(a, b) {
+            return (
+                a.x < b.x + b.w &&
+                a.x + a.w > b.x &&
+                a.y < b.y + b.h &&
+                a.y + a.h > b.y
+            );
+        }
+
+        function updateEntities(dt) {
+            // 1. Pociski z rewolweru
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx * dt;
+                b.life -= dt;
+
+                if (b.life <= 0 || isSolidAt(b.x + b.w / 2, b.y + b.h / 2)) {
+                    spawnParticles(b.x, b.y, '#f5b82e', 5);
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Trafienie przeciwnika
+                for (const en of enemies) {
+                    if (rectsOverlap(b, en)) {
+                        en.stunTimer = 4.5; // Ogłuszenie mumii/pająka na 4.5 sekundy
+                        score += 50;
+                        updateHUD();
+                        playPokey('stun');
+                        spawnParticles(en.x + en.w / 2, en.y + en.h / 2, '#2ce8f5', 12);
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // 2. Zbieranie przedmiotów (Klucz, Skarby, Naboje, Manierka)
+            for (const it of items) {
+                if (!it.collected && rectsOverlap(player, it)) {
+                    it.collected = true;
+                    if (it.type === 'key') {
+                        hasKey = true;
+                        score += 300;
+                        playPokey('key');
+                        spawnParticles(it.x + 10, it.y + 10, '#f5b82e', 18);
+                    } else if (it.type === 'chest') {
+                        score += 250;
+                        playPokey('pickup');
+                        spawnParticles(it.x + 10, it.y + 10, '#f5b82e', 12);
+                    } else if (it.type === 'gem') {
+                        score += 100;
+                        playPokey('pickup');
+                        spawnParticles(it.x + 8, it.y + 8, '#2ce8f5', 10);
+                    } else if (it.type === 'ammo') {
+                        ammo = Math.min(12, ammo + 4);
+                        score += 50;
+                        playPokey('pickup');
+                        spawnParticles(it.x + 8, it.y + 8, '#ff9f43', 10);
+                    } else if (it.type === 'water') {
+                        lives = Math.min(5, lives + 1);
+                        score += 150;
+                        playPokey('key');
+                        spawnParticles(it.x + 8, it.y + 8, '#63c74d', 14);
+                    }
+                    updateHUD();
+                }
+            }
+
+            // 3. Przeciwnicy (Mumie, Pająki na linach, Nietoperze)
+            for (const en of enemies) {
+                if (en.stunTimer > 0) {
+                    en.stunTimer -= dt;
+                    continue;
+                }
+
+                if (en.type === 'mummy') {
+                    const nextX = en.x + en.dir * en.vx * dt;
+                    const frontX = en.dir === 1 ? nextX + en.w + 2 : nextX - 2;
+                    const wallAhead = isSolidAt(frontX, en.y + 6) || isSolidAt(frontX, en.y + en.h - 4);
+                    const floorAhead = isSolidAt(frontX, en.y + en.h + 4);
+
+                    if (wallAhead || !floorAhead) {
+                        en.dir *= -1;
+                    } else {
+                        en.x = nextX;
+                    }
+                } else if (en.type === 'spider') {
+                    en.y += en.dir * en.speed * dt;
+                    if (en.y > en.baseY + en.range) {
+                        en.y = en.baseY + en.range;
+                        en.dir = -1;
+                    } else if (en.y < en.baseY - 12) {
+                        en.y = en.baseY - 12;
+                        en.dir = 1;
+                    }
+                } else if (en.type === 'bat') {
+                    en.phase += dt * 4.5;
+                    const nextX = en.x + en.dir * en.vx * dt;
+                    const frontX = en.dir === 1 ? nextX + en.w + 2 : nextX - 2;
+                    if (isSolidAt(frontX, en.baseY + 8)) {
+                        en.dir *= -1;
+                    } else {
+                        en.x = nextX;
+                    }
+                    en.y = en.baseY + Math.sin(en.phase) * 14;
+                }
+
+                // Kolizja z graczem (gdy wróg nie jest ogłuszony)
+                if (player.invulnTimer <= 0 && rectsOverlap(player, en)) {
+                    damagePlayer();
+                }
+            }
+
+            // 4. Krople kwasu / spadające kamienie
+            for (const hz of hazards) {
+                if (hz.waitTimer > 0) {
+                    hz.waitTimer -= dt;
+                } else {
+                    hz.vy += 340 * dt;
+                    hz.y += hz.vy * dt;
+
+                    if (player.invulnTimer <= 0 && rectsOverlap(player, hz)) {
+                        damagePlayer();
+                        resetHazard(hz);
+                    } else if (isSolidAt(hz.x + hz.w / 2, hz.y + hz.h)) {
+                        spawnParticles(hz.x + 4, hz.y + hz.h, '#63c74d', 6);
+                        resetHazard(hz);
+                    }
+                }
+            }
+
+            // 5. Cząsteczki
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // 6. Sprawdzenie wejścia do otwartych drzwi wyjściowych
+            if (hasKey && rectsOverlap(player, exitDoor)) {
+                completeCurrentStage();
+            }
+        }
+
+        function resetHazard(hz) {
+            hz.x = hz.spawnX;
+            hz.y = hz.spawnY;
+            hz.vy = 0;
+            hz.waitTimer = 1.6 + Math.random() * 1.4;
+        }
+
+        function damagePlayer() {
+            lives--;
+            player.invulnTimer = 2.0;
+            playPokey('hurt');
+            spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#e43b44', 18);
+            updateHUD();
+
+            if (lives <= 0) {
+                gameState = 'GAMEOVER';
+                document.getElementById('finalGameOverScore').textContent = `TWÓJ WYNIK: ${score}`;
+                gameOverOverlay.classList.remove('hidden');
+            }
+        }
+
+        function completeCurrentStage() {
+            playPokey('stageClear');
+            const bonus = lives * 150 + ammo * 25;
+            score += bonus;
+            updateHUD();
+
+            if (levelIndex < LEVELS.length - 1) {
+                gameState = 'STAGECLEAR';
+                document.getElementById('stageClearTitle').textContent = `${LEVELS[levelIndex].name} UKOŃCZONA!`;
+                document.getElementById('stageBonusText').textContent = `PREMIA ZA ŻYCIA I NABOJE: +${bonus} PKT`;
+                stageClearOverlay.classList.remove('hidden');
+            } else {
+                gameState = 'VICTORY';
+                document.getElementById('finalVictoryScore').textContent = `KOŃCOWY WYNIK: ${score}`;
+                victoryOverlay.classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // RENDEROWANIE GRAFIKI 8-BIT ATARI XL/XE
+        // ==========================================
+        function render() {
+            const lvl = LEVELS[levelIndex] || LEVELS[0];
+
+            // Tło komnaty
+            ctx.fillStyle = lvl.bgTint;
+            ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+            // Dekoracyjne hieroglify w tle (subtelny klimat Atari)
+            ctx.fillStyle = 'rgba(245, 184, 46, 0.04)';
+            for (let r = 1; r < ROWS - 2; r += 3) {
+                for (let c = 2; c < COLS - 2; c += 4) {
+                    ctx.fillRect(c * TILE + 8, r * TILE + 8, 16, 16);
+                }
+            }
+
+            // Rysowanie lin wspinaczkowych
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (ropes[r][c]) {
+                        const rx = c * TILE + TILE / 2;
+                        const ry = r * TILE;
+                        ctx.fillStyle = '#d48b3b';
+                        ctx.fillRect(rx - 2, ry, 4, TILE);
+                        // Splot liny
+                        ctx.fillStyle = '#ffd452';
+                        for (let y = ry + 2; y < ry + TILE; y += 6) {
+                            ctx.fillRect(rx - 3, y, 6, 2);
+                        }
+                    }
+                }
+            }
+
+            // Rysowanie kamiennych bloków piramidy
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (tiles[r][c] === 1) {
+                        const bx = c * TILE;
+                        const by = r * TILE;
+                        ctx.fillStyle = lvl.wallColor;
+                        ctx.fillRect(bx, by, TILE, TILE);
+
+                        // Górna krawędź i cegiełki 8-bit
+                        ctx.fillStyle = lvl.wallTrim;
+                        ctx.fillRect(bx, by, TILE, 3);
+
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(bx + 1, by + 1, TILE - 2, TILE - 2);
+                        ctx.beginPath();
+                        ctx.moveTo(bx, by + TILE / 2);
+                        ctx.lineTo(bx + TILE, by + TILE / 2);
+                        ctx.moveTo(bx + TILE / 2, by);
+                        ctx.lineTo(bx + TILE / 2, by + TILE / 2);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // Drzwi wyjściowe
+            drawExitDoor();
+
+            // Przedmioty do zebrania
+            for (const it of items) {
+                if (!it.collected) drawItem(it);
+            }
+
+            // Krople kwasu
+            for (const hz of hazards) {
+                ctx.fillStyle = '#63c74d';
+                ctx.beginPath();
+                ctx.arc(hz.x + hz.w / 2, hz.y + hz.h / 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(hz.x + 2, hz.y, 4, 5);
+            }
+
+            // Przeciwnicy
+            for (const en of enemies) {
+                drawEnemy(en);
+            }
+
+            // Pociski
+            ctx.fillStyle = '#fff2b2';
+            for (const b of bullets) {
+                ctx.fillRect(b.x, b.y, b.w, b.h);
+            }
+
+            // Archeolog (Gracz)
+            drawExplorer();
+
+            // Cząsteczki
+            for (const p of particles) {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+            }
+        }
+
+        function drawExitDoor() {
+            const { x, y, w, h } = exitDoor;
+            ctx.fillStyle = hasKey ? '#63c74d' : '#4a2511';
+            ctx.fillRect(x + 3, y + 2, w - 6, h - 2);
+
+            ctx.strokeStyle = hasKey ? '#ffffff' : '#f5b82e';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 3, y + 2, w - 6, h - 2);
+
+            if (hasKey) {
+                // Migający napis EXIT nad otwartymi drzwiami
+                ctx.fillStyle = Math.floor(globalTime * 6) % 2 === 0 ? '#ffffff' : '#2ce8f5';
+                ctx.font = '7px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('WYJŚCIE', x + w / 2, y - 3);
+            } else {
+                // Kłódka na zamkniętych drzwiach
+                ctx.fillStyle = '#e43b44';
+                ctx.fillRect(x + 12, y + 14, 8, 8);
+            }
+        }
+
+        function drawItem(it) {
+            const bob = Math.sin(globalTime * 5 + it.x) * 2;
+            const y = it.y + bob;
+
+            if (it.type === 'key') {
+                ctx.fillStyle = '#ffd452';
+                ctx.beginPath();
+                ctx.arc(it.x + 6, y + 10, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(it.x + 10, y + 8, 9, 4);
+                ctx.fillRect(it.x + 15, y + 12, 3, 4);
+            } else if (it.type === 'chest') {
+                ctx.fillStyle = '#a85a1e';
+                ctx.fillRect(it.x, y + 4, it.w, it.h - 4);
+                ctx.fillStyle = '#f5b82e';
+                ctx.fillRect(it.x, y + 2, it.w, 4);
+                ctx.fillRect(it.x + 9, y + 7, 4, 5);
+            } else if (it.type === 'gem') {
+                ctx.fillStyle = '#2ce8f5';
+                ctx.beginPath();
+                ctx.moveTo(it.x + 8, y);
+                ctx.lineTo(it.x + 16, y + 8);
+                ctx.lineTo(it.x + 8, y + 16);
+                ctx.lineTo(it.x, y + 8);
+                ctx.closePath();
+                ctx.fill();
+            } else if (it.type === 'ammo') {
+                ctx.fillStyle = '#ff9f43';
+                ctx.fillRect(it.x + 2, y + 4, 14, 12);
+                ctx.fillStyle = '#fff2b2';
+                ctx.fillRect(it.x + 4, y + 1, 3, 4);
+                ctx.fillRect(it.x + 11, y + 1, 3, 4);
+            } else if (it.type === 'water') {
+                ctx.fillStyle = '#38ada9';
+                ctx.beginPath();
+                ctx.arc(it.x + 8, y + 12, 7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#d48b3b';
+                ctx.fillRect(it.x + 6, y + 2, 4, 4);
+            }
+        }
+
+        function drawEnemy(en) {
+            ctx.save();
+            if (en.stunTimer > 0) {
+                // Miganie ogłuszonego przeciwnika
+                ctx.globalAlpha = Math.floor(globalTime * 14) % 2 === 0 ? 0.35 : 0.85;
+            }
+
+            if (en.type === 'mummy') {
+                // Bandana mumia 8-bit
+                ctx.fillStyle = '#e8dfc8';
+                ctx.fillRect(en.x + 3, en.y + 2, en.w - 6, en.h - 2);
+                // Paski bandaży
+                ctx.fillStyle = '#8c7f6a';
+                for (let y = en.y + 6; y < en.y + en.h; y += 5) {
+                    ctx.fillRect(en.x + 3, y, en.w - 6, 2);
+                }
+                // Świecące czerwone oczy mumii
+                ctx.fillStyle = '#e43b44';
+                const eyeOffset = en.dir === 1 ? 4 : 0;
+                ctx.fillRect(en.x + 5 + eyeOffset, en.y + 6, 3, 3);
+                ctx.fillRect(en.x + 10 + eyeOffset, en.y + 6, 3, 3);
+            } else if (en.type === 'spider') {
+                // Pająk grobowy
+                ctx.fillStyle = '#a55eea';
+                ctx.beginPath();
+                ctx.arc(en.x + en.w / 2, en.y + en.h / 2, 7, 0, Math.PI * 2);
+                ctx.fill();
+                // Odnóża
+                ctx.strokeStyle = '#d1a3ff';
+                ctx.lineWidth = 2;
+                const legWave = Math.sin(globalTime * 15) * 3;
+                ctx.beginPath();
+                ctx.moveTo(en.x, en.y + 4 + legWave);
+                ctx.lineTo(en.x + en.w, en.y + 14 - legWave);
+                ctx.moveTo(en.x, en.y + 14 - legWave);
+                ctx.lineTo(en.x + en.w, en.y + 4 + legWave);
+                ctx.stroke();
+                // Oczy
+                ctx.fillStyle = '#ffdd59';
+                ctx.fillRect(en.x + 7, en.y + 7, 2, 2);
+                ctx.fillRect(en.x + 11, en.y + 7, 2, 2);
+            } else if (en.type === 'bat') {
+                // Nietoperz / Skarabeusz
+                const flap = Math.sin(globalTime * 22) * 5;
+                ctx.fillStyle = '#ff6b81';
+                ctx.fillRect(en.x + 8, en.y + 5, 8, 8);
+                // Skrzydła
+                ctx.beginPath();
+                ctx.moveTo(en.x + 8, en.y + 8);
+                ctx.lineTo(en.x, en.y + 3 + flap);
+                ctx.lineTo(en.x + 6, en.y + 13);
+                ctx.moveTo(en.x + 16, en.y + 8);
+                ctx.lineTo(en.x + 24, en.y + 3 + flap);
+                ctx.lineTo(en.x + 18, en.y + 13);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        function drawExplorer() {
+            // Miganie po utracie życia
+            if (player.invulnTimer > 0 && Math.floor(globalTime * 16) % 2 === 0) {
+                return;
+            }
+
+            const { x, y, w, h, facing } = player;
+
+            // Kapelusz odkrywcy (jak u Freda z Atari!)
+            ctx.fillStyle = '#8c5220';
+            ctx.fillRect(x, y + 4, w, 3); // Rondo kapelusza
+            ctx.fillRect(x + 4, y, w - 8, 5); // Główka kapelusza
+
+            // Głowa
+            ctx.fillStyle = '#ffcca3';
+            ctx.fillRect(x + 5, y + 7, w - 10, 6);
+
+            // Oko
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(facing === 1 ? x + 12 : x + 6, y + 8, 2, 2);
+
+            // Koszula poszukiwacza przygód
+            ctx.fillStyle = '#2ce8f5';
+            ctx.fillRect(x + 4, y + 13, w - 8, 8);
+
+            // Rewolwer w dłoni
+            ctx.fillStyle = '#dfe4ea';
+            if (facing === 1) {
+                ctx.fillRect(x + w - 3, y + 14, 6, 3);
+            } else {
+                ctx.fillRect(x - 3, y + 14, 6, 3);
+            }
+
+            // Animowane nogi podczas biegu lub wspinaczki po linie
+            ctx.fillStyle = '#5a3921';
+            const stride = Math.sin(player.animTimer) * 3;
+            ctx.fillRect(x + 5, y + 21, 4, 7 + (player.onGround || player.onRope ? stride * 0.4 : -2));
+            ctx.fillRect(x + 11, y + 21, 4, 7 - (player.onGround || player.onRope ? stride * 0.4 : 0));
+        }
+
+        // ==========================================
+        // GŁÓWNA PĘTLA GRY (60 FPS)
+        // ==========================================
+        let lastTime = 0;
+
+        function gameLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+            lastTime = timestamp;
+            globalTime += dt;
+
+            if (gameState === 'PLAYING') {
+                updatePlayer(dt);
+                updateEntities(dt);
+            }
+
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==========================================
+        // OBSŁUGA KLAWIATURY I PRZYCISKÓW DOTYKOWYCH
+        // ==========================================
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
+                e.preventDefault();
+            }
+
+            if (k === 'arrowleft' || k === 'a') input.left = true;
+            if (k === 'arrowright' || k === 'd') input.right = true;
+            if (k === 'arrowup' || k === 'w') {
+                if (!input.up) input.jumpPressed = true;
+                input.up = true;
+            }
+            if (k === 'arrowdown' || k === 's') input.down = true;
+            if (k === 'x') input.jumpPressed = true;
+            if (k === ' ' || k === 'z') input.shootPressed = true;
+
+            if (k === 'p') togglePause();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'arrowleft' || k === 'a') input.left = false;
+            if (k === 'arrowright' || k === 'd') input.right = false;
+            if (k === 'arrowup' || k === 'w') input.up = false;
+            if (k === 'arrowdown' || k === 's') input.down = false;
+        });
+
+        // Przyciski dotykowe na telefon/tablet
+        document.querySelectorAll('.t-btn').forEach(btn => {
+            const key = btn.getAttribute('data-key');
+
+            const press = (e) => {
+                e.preventDefault();
+                btn.classList.add('pressed');
+                if (key === 'left') input.left = true;
+                if (key === 'right') input.right = true;
+                if (key === 'up') { input.up = true; input.jumpPressed = true; }
+                if (key === 'down') input.down = true;
+                if (key === 'jump') input.jumpPressed = true;
+                if (key === 'shoot') input.shootPressed = true;
+            };
+
+            const release = (e) => {
+                e.preventDefault();
+                btn.classList.remove('pressed');
+                if (key === 'left') input.left = false;
+                if (key === 'right') input.right = false;
+                if (key === 'up') input.up = false;
+                if (key === 'down') input.down = false;
+            };
+
+            btn.addEventListener('touchstart', press, { passive: false });
+            btn.addEventListener('touchend', release, { passive: false });
+            btn.addEventListener('mousedown', press);
+            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mouseleave', release);
+        });
+
+        // Przyciski menu i nakładek
+        function startNewCampaign() {
+            ensureAudio();
+            score = 0;
+            lives = 3;
+            ammo = 6;
+            startOverlay.classList.add('hidden');
+            stageClearOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            victoryOverlay.classList.add('hidden');
+            loadLevel(0);
+            gameState = 'PLAYING';
+        }
+
+        function togglePause() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('pauseBtn').textContent = 'WZNÓW';
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('pauseBtn').textContent = 'PAUZA';
+                lastTime = performance.now();
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', startNewCampaign);
+        document.getElementById('retryBtn').addEventListener('click', startNewCampaign);
+        document.getElementById('playAgainVictoryBtn').addEventListener('click', startNewCampaign);
+
+        document.getElementById('nextStageBtn').addEventListener('click', () => {
+            stageClearOverlay.classList.add('hidden');
+            loadLevel(levelIndex + 1);
+            gameState = 'PLAYING';
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+        document.getElementById('crtBtn').addEventListener('click', (e) => {
+            document.body.classList.toggle('crt-on');
+            const isOn = document.body.classList.contains('crt-on');
+            e.target.textContent = isOn ? 'CRT: WŁ.' : 'CRT: WYŁ.';
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', (e) => {
+            soundEnabled = !soundEnabled;
+            e.target.textContent = soundEnabled ? 'DŹWIĘK: WŁ.' : 'DŹWIĘK: WYŁ.';
+        });
+
+        // Inicjalizacja gry
+        window.onload = function () {
+            loadLevel(0);
+            resizeCanvas();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>

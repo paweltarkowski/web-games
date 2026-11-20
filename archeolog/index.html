@@ -151,6 +151,24 @@
             pointer-events: none;
         }
 
+        #hintOverlay {
+            z-index: 21;
+        }
+
+        #hintSteps {
+            text-align: left;
+            max-width: 620px;
+            font-size: clamp(0.52rem, 1.5vw, 0.68rem);
+            line-height: 1.8;
+            color: #e6d5b8;
+            margin-bottom: 14px;
+        }
+
+        #hintSteps p {
+            margin: 2px 0;
+            max-width: none;
+        }
+
         .overlay h2 {
             font-size: clamp(1rem, 3.5vw, 1.75rem);
             margin-bottom: 12px;
@@ -397,12 +415,20 @@
             <p style="color: var(--atari-cyan);" id="finalVictoryScore">KOŃCOWY WYNIK: 0</p>
             <button class="btn-atari" id="playAgainVictoryBtn">ZAGRAJ OD NOWA</button>
         </div>
+
+        <!-- Podpowiedź do aktualnej planszy -->
+        <div class="overlay hidden" id="hintOverlay">
+            <h2 class="title-cyan">PODPOWIEDŹ DO MISJI</h2>
+            <div id="hintSteps"></div>
+            <button class="btn-atari" id="closeHintBtn">ZAMKNIJ PODPOWIEDŹ</button>
+        </div>
     </div>
 
     <!-- Pasek narzędzi -->
     <div class="toolbar">
         <span class="controls-hint">KLAWIATURA: STRZAŁKI / WSAD • GÓRA/W: LINY/SKOK • SKOK: X • STRZAŁ: SPACJA / Z • PAUZA: P</span>
         <div class="btn-mini-group">
+            <button class="btn-mini" id="hintBtn">PODPOWIEDŹ</button>
             <button class="btn-mini" id="pauseBtn">PAUZA</button>
             <button class="btn-mini" id="crtBtn">CRT: WŁ.</button>
             <button class="btn-mini" id="soundBtn">DŹWIĘK: WŁ.</button>
@@ -546,6 +572,30 @@
             }
         ];
 
+        const MISSION_HINTS = [
+            [
+                "1. Zacznij od startu po lewej stronie dolnego korytarza i idź w prawo.",
+                "2. Wykorzystaj pionowe liny z prawej strony: GÓRA/W albo DÓŁ/S pozwala wspinać się i schodzić.",
+                "3. Złoty klucz znajduje się po prawej stronie dolnego korytarza — zbierz go, unikając mumii i pająków.",
+                "4. Następnie znajdź prawą pionową linę i wspinaj się nią ku górnej części planszy.",
+                "5. Przejdź do zielonych drzwi w górnym prawym rogu. Skokem może pomóc przycisk SKOK lub X."
+            ],
+            [
+                "1. Startujesz u dołu planszy; przedostrzegaj się nietoperzy i mumii.",
+                "2. Liny po lewej i środku prowadzą do klucza na górnej półce.",
+                "3. Ogłuszaj przeciwników strzałem (Spacja/Z), jeśli blokują przejście.",
+                "4. Zebraliwszy klucz, wróć centralną linią i przejdź do wyjścia po prawej górze.",
+                "5. W razie upadku wróć do najbliższej liny i wspinaj się ponownie."
+            ],
+            [
+                "1. Start masz w lewym dolnym rogu; klucz znajduje się po prawej stronie najwyższej części.",
+                "2. Poziomo przeskocz przeszkody i używaj środkowych lin do zmiany pięter.",
+                "3. Zatrzymuj mumie strzałami i uważać na spadające krople oraz pająki.",
+                "4. Po zabraniu klucza kieruj się na lewą stronę górnej części planszy.",
+                "5. Dotknij zielonych drzwi przy lewej krawędzi, aby ukończyć ostatnią misję."
+            ]
+        ];
+
         // Stan globalny gry
         let levelIndex = 0;
         let score = 0;
@@ -556,6 +606,7 @@
         let gameState = 'START'; // START, PLAYING, PAUSED, STAGECLEAR, GAMEOVER, VICTORY
         let soundEnabled = true;
         let globalTime = 0;
+        let hintWasPlaying = false;
 
         // Dane bieżącej planszy
         let tiles = [];
@@ -1631,6 +1682,33 @@
         });
 
         document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+        function openHint() {
+            const hintOverlay = document.getElementById('hintOverlay');
+            hintWasPlaying = gameState === 'PLAYING';
+            if (hintWasPlaying) gameState = 'PAUSED';
+            document.getElementById('hintSteps').innerHTML = MISSION_HINTS[levelIndex]
+                .map(step => `<p>${step}</p>`).join('');
+            hintOverlay.classList.remove('hidden');
+        }
+
+        function closeHint() {
+            document.getElementById('hintOverlay').classList.add('hidden');
+            if (hintWasPlaying && gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                lastTime = performance.now();
+            }
+            hintWasPlaying = false;
+        }
+
+        document.getElementById('hintBtn').addEventListener('click', openHint);
+        document.getElementById('closeHintBtn').addEventListener('click', closeHint);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('hintOverlay').classList.contains('hidden')) {
+                closeHint();
+            }
+        });
 
         document.getElementById('crtBtn').addEventListener('click', (e) => {
             document.body.classList.toggle('crt-on');
